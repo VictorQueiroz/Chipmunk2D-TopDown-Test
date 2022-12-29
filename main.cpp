@@ -34,34 +34,31 @@ int main() {
     SDL_Event e;
     cpSpace* space = cpSpaceNew();
     std::vector<Body> bodies{};
-    int initialBoxCount = 6;
+    unsigned int i,initialBoxCount = 6;
     float x,y,mass = 0.25f;
 
     cpFloat width = SQUARE_SIZE * CHIPMUNK_SCALE;
     cpFloat height = SQUARE_SIZE * CHIPMUNK_SCALE;
-    cpBody* rootAnchorBody = cpBodyNew(mass, cpMomentForBox(mass,width,height));
-    {
-        cpShape* rootAnchorShape = cpBoxShapeNew(rootAnchorBody,width,height,0.0f);
-        cpShapeSetFriction(rootAnchorShape,1.0f);
-        cpShapeSetDensity(rootAnchorShape,1.0f);
-        cpBodySetPosition(rootAnchorBody,cpvzero);
-        cpSpaceAddBody(space,rootAnchorBody);
-        cpSpaceAddShape(space,rootAnchorShape);
-    }
 
-    for(int i = 0; i < initialBoxCount; i++){
+    bool isPlayable;
+
+    for(i = 0; i < initialBoxCount; i++){
+        isPlayable = i == (initialBoxCount - 1);
+        y = float(i) * SQUARE_SIZE;
+        x = float(i) * SQUARE_SIZE;
+
+        /**
+         * create body
+         */
         cpFloat moment = cpMomentForBox(mass, width, height);
-        bool isPlayable = i == (initialBoxCount - 1);
         cpBody* body = isPlayable ? cpBodyNew(mass,moment) : cpBodyNewStatic();
 
         /**
          * create body shape
          */
         cpShape* shape = cpBoxShapeNew(body, width, height, 0.0f);
-        cpShapeSetFriction(shape,10000.0f);
+        cpShapeSetFriction(shape,1.0f);
 
-        y = float(i) * SQUARE_SIZE;
-        x = float(i) * SQUARE_SIZE;
         cpBodySetPosition(body,cpv(x * CHIPMUNK_SCALE,y * CHIPMUNK_SCALE));
         cpSpaceAddBody(space,body);
         auto& b = bodies.emplace_back(Body{
