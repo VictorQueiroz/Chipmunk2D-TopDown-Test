@@ -53,7 +53,13 @@ int main() {
         cpFloat moment = cpMomentForBox(mass, width, height);
         bool isPlayable = i == (initialBoxCount - 1);
         cpBody* body = isPlayable ? cpBodyNew(mass,moment) : cpBodyNewStatic();
+
+        /**
+         * create body shape
+         */
         cpShape* shape = cpBoxShapeNew(body, width, height, 0.0f);
+        cpShapeSetFriction(shape,10000.0f);
+
         y = float(i) * SQUARE_SIZE;
         x = float(i) * SQUARE_SIZE;
         cpBodySetPosition(body,cpv(x * CHIPMUNK_SCALE,y * CHIPMUNK_SCALE));
@@ -65,22 +71,22 @@ int main() {
             .shape = shape
         });
         if(isPlayable){
-            BodyPlayable playable;
-            playable.targetPoint = cpBodyNew(
-                mass,
-                cpMomentForBox(mass,CHIPMUNK_SCALE * SQUARE_SIZE,CHIPMUNK_SCALE * CHIPMUNK_SCALE)
-            );
-            cpBodySetPosition(playable.targetPoint,cpv(x,y));
+            BodyPlayable playable{};
+//            playable.targetPoint = cpBodyNew(
+//                mass,
+//                cpMomentForBox(mass,CHIPMUNK_SCALE * SQUARE_SIZE,CHIPMUNK_SCALE * CHIPMUNK_SCALE)
+//            );
+//            cpBodySetPosition(playable.targetPoint,cpv(x,y));
+//
+//            cpConstraint* pj = cpPivotJointNew(playable.targetPoint,body,cpvzero);
+//            pj->maxBias = 200.0f;
+//            pj->maxForce = 1000.0f;
+//            cpSpaceAddConstraint(space,pj);
+//
+//            cpConstraint* gj = cpGearJointNew(playable.targetPoint,body,0.0f,1.0f);
+//            cpSpaceAddConstraint(space,gj);
 
-            cpConstraint* pj = cpPivotJointNew(playable.targetPoint,body,cpvzero);
-            pj->maxBias = 200.0f;
-            pj->maxForce = 1000.0f;
-            cpSpaceAddConstraint(space,pj);
-
-            cpConstraint* gj = cpGearJointNew(playable.targetPoint,body,0.0f,1.0f);
-            cpSpaceAddConstraint(space,gj);
-
-//            cpShapeSetFriction(shape,10000.0f);
+            b.playable = playable;
             cpSpaceAddShape(space,shape);
         } else {
             cpBodyActivateStatic(body,shape);
