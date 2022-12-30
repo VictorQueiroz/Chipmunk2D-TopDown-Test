@@ -10,7 +10,7 @@
 #define CHIPMUNK_SCALE 10.0f
 
 struct BodyPlayable{
-    cpBody* targetPoint;
+    cpBody* controlBody;
 };
 
 struct Body {
@@ -20,6 +20,19 @@ struct Body {
     cpShape* shape;
     std::optional<BodyPlayable> playable;
 };
+
+cpBody* createBox(cpSpace* space,double w, double h){
+    double mass = 1.0;
+
+    cpBody* body = cpSpaceAddBody(space, cpBodyNew(mass,cpMomentForBox(mass,w,h)));
+//    cpBodySetPosition(body,)
+
+    cpShape* shape = cpSpaceAddShape(space,cpBoxShapeNew(body, w, h, 0.0f));
+    cpShapeSetFriction(shape,0.5);
+    cpShapeSetElasticity(shape,0.0);
+
+    return body;
+}
 
 int main() {
     SDL_Init(SDL_INIT_EVERYTHING);
@@ -32,10 +45,15 @@ int main() {
     auto* renderer = SDL_CreateRenderer(w,0,SDL_RENDERER_ACCELERATED);
     bool running = true;
     SDL_Event e;
-    cpSpace* space = cpSpaceNew();
     std::vector<Body> bodies{};
     unsigned int i,initialBoxCount = 6;
     float x,y,mass = 0.25f;
+
+    /**
+     * create space
+     */
+    cpSpace* space = cpSpaceNew();
+    cpSpaceSetGravity(space,cpv(0,0));
 
     cpFloat width = SQUARE_SIZE * CHIPMUNK_SCALE;
     cpFloat height = SQUARE_SIZE * CHIPMUNK_SCALE;
@@ -44,49 +62,54 @@ int main() {
 
     for(i = 0; i < initialBoxCount; i++){
         isPlayable = i == (initialBoxCount - 1);
-        y = float(i) * SQUARE_SIZE;
-        x = float(i) * SQUARE_SIZE;
+        y = float(i) * SQUARE_SIZE * CHIPMUNK_SCALE;
+        x = float(i) * SQUARE_SIZE * CHIPMUNK_SCALE;
 
         /**
-         * create body
+         * create playerBody
          */
-        cpFloat moment = cpMomentForBox(mass, width, height);
-        cpBody* body = isPlayable ? cpBodyNew(mass,moment) : cpBodyNewStatic();
+        cpBody* playerBody = isPlayable ? cpBodyNew(mass, INFINITY) : cpBodyNewStatic();
+        cpBodySetPosition(playerBody, cpv(x, y));
+        cpSpaceAddBody(space, playerBody);
 
         /**
-         * create body shape
+         * create playerBody shape
          */
-        cpShape* shape = cpBoxShapeNew(body, width, height, 0.0f);
-        cpShapeSetFriction(shape,1.0f);
+        cpShape* shape = cpBoxShapeNew(playerBody, width, height, 0.0);
+        cpShapeSetFriction(shape,1.0);
+        cpShapeSetElasticity(shape,0.0);
 
-        cpBodySetPosition(body,cpv(x * CHIPMUNK_SCALE,y * CHIPMUNK_SCALE));
-        cpSpaceAddBody(space,body);
         auto& b = bodies.emplace_back(Body{
-            .position = {x,y},
+            .position = {x / CHIPMUNK_SCALE,y / CHIPMUNK_SCALE},
             .color = {1.0f,1.0f,1.0f,1.0f},
-            .body = body,
+            .body = playerBody,
             .shape = shape
         });
+
         if(isPlayable){
             BodyPlayable playable{};
-//            playable.targetPoint = cpBodyNew(
-//                mass,
-//                cpMomentForBox(mass,CHIPMUNK_SCALE * SQUARE_SIZE,CHIPMUNK_SCALE * CHIPMUNK_SCALE)
-//            );
-//            cpBodySetPosition(playable.targetPoint,cpv(x,y));
-//
-//            cpConstraint* pj = cpPivotJointNew(playable.targetPoint,body,cpvzero);
-//            pj->maxBias = 200.0f;
-//            pj->maxForce = 1000.0f;
-//            cpSpaceAddConstraint(space,pj);
-//
-//            cpConstraint* gj = cpGearJointNew(playable.targetPoint,body,0.0f,1.0f);
-//            cpSpaceAddConstraint(space,gj);
+            auto& controlBody = playable.controlBody;
+
+            /**
+             * target point
+             */
+            controlBody = cpSpaceAddBody(space, cpBodyNewKinematic());
+//            cpBodySetPosition(controlBody, cpv(x, y));
+
+            cpConstraint* pj = cpPivotJointNew2(controlBody, playerBody, cpvzero, cpvzero);
+            cpConstraintSetMaxBias(pj,0.0f * CHIPMUNK_SCALE);
+            cpConstraintSetMaxForce(pj,10000.0f * CHIPMUNK_SCALE);
+            cpSpaceAddConstraint(space,pj);
+
+            cpConstraint* gj = cpGearJointNew(controlBody, playerBody, 0.0f, 1.0f);
+            cpConstraintSetErrorBias(gj,0);
+            cpConstraintSetMaxBias(gj,1.2f * CHIPMUNK_SCALE);
+            cpConstraintSetMaxForce(gj,50000.0f * CHIPMUNK_SCALE);
+            cpSpaceAddConstraint(space,gj);
 
             b.playable = playable;
-            cpSpaceAddShape(space,shape);
         } else {
-            cpBodyActivateStatic(body,shape);
+            cpBodyActivateStatic(playerBody, shape);
             cpSpaceAddShape(space,shape);
         }
     }
@@ -120,19 +143,33 @@ int main() {
                         if(!b.playable.has_value()){
                             continue;
                         }
-//                        b.position[0] += inc[0] * 2.0f;
-//                        b.position[1] += inc[1] * 2.0f;
-//                        inc[0] *= 100.0f;
-//                        inc[1] *= 100.0f;
+
+                        /**
+                         * multiply inc by chipmunk scale
+                         */
                         inc[0] *= CHIPMUNK_SCALE;
                         inc[1] *= CHIPMUNK_SCALE;
+
+                        cpBody* targetPoint = b.playable->controlBody;
+//                        cpVect vel = cpBodyGetVelocity(targetPoint);
+//                        vel = cpv(inc[0],inc[1]);
+                        cpBodySetVelocity(targetPoint,cpv(inc[0],inc[1]));
+//
+//                        if(inc[0] == 0.0f){
+//                            cpVect vel = cpBodyGetVelocity(targetPoint);
+//                            cpBodySetVelocity(targetPoint,cpv(0.0,vel.y));
+//                        }
+//
+//                        if(inc[1] == 0.0f){
+//                            cpVect vel = cpBodyGetVelocity(targetPoint);
+//                            cpBodySetVelocity(targetPoint,cpv(vel.x,0.0));
+//                        }
+//
 //                        if(inc[0] == 0.0f && inc[1] == 0.0f){
-//                            cpBodySetVelocity(b.body,cpv(0,0));
 //                            break;
 //                        }
-//                        cpBodySetVelocity(b.body,cpv(inc[0],inc[1]));
-                        cpBodyApplyImpulseAtLocalPoint(b.body,cpv(inc[0],inc[1]),cpv(0.0f,0.0f));
-//                        cpBodyApplyForceAtLocalPoint(b.body,cpv(-100.0f,-100.0f),cpv(0.0f,0.0f));)
+//
+//                        cpBodySetVelocity(targetPoint,cpv(inc[0],inc[1]));
                         break;
                     }
                     break;
@@ -156,9 +193,19 @@ int main() {
 //            cpBodySetPosition(b.body,cpv(b.position[0],b.position[1]));
 //        }
         /**
+         * update velocity of playable bodies
+         */
+        for(Body& body : bodies){
+            if(!body.playable.has_value()) continue;
+            cpVect vel = cpBodyGetVelocity(body.playable->controlBody);
+            vel = vel - (vel * 0.25 * dt);
+            cpBodySetVelocity(body.playable->controlBody, vel);
+        }
+        /**
          * advance in time
          */
         cpSpaceStep(space,dt);
+        uint8_t j = 0;
         for(auto& b : bodies){
             cpVect position = cpBodyGetPosition(b.body);
             rect = {
@@ -167,9 +214,10 @@ int main() {
                 .w = SQUARE_SIZE_INT,
                 .h = SQUARE_SIZE_INT
             };
-            SDL_SetRenderDrawColor(renderer,255,255,255,255);
+            uint8_t color[4] = {255,j,255,255};
+            SDL_SetRenderDrawColor(renderer,color[0],color[1],color[2],color[3]);
             SDL_RenderFillRect(renderer,&rect);
-            b.body->w *= .99f;
+            j++;
         }
         SDL_RenderPresent(renderer);
     }
