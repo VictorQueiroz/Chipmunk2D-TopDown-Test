@@ -4,7 +4,7 @@ project(ChipmunkTest)
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(PkgConfig)
-pkg_check_modules(TEST REQUIRED sdl2)
+pkg_check_modules(TEST REQUIRED sdl2 freetype2)
 
 add_executable(ChipmunkTest main.cpp)
 target_link_libraries(ChipmunkTest PRIVATE chipmunk ${TEST_LIBRARIES})
